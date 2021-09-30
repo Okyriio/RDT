@@ -11,11 +11,12 @@ void Sender::ReceivePacket(const Packet &packet)
 {
     //check if received packet is corrupted
 
-		CheckCorrupt(packet);
+		if(!CheckCorrupt(packet))
+            return;
     
         bool isAck = packet.data[0];
-        byte seqNmb = packet.sequenceNmb ;
-        const Packet& sentPacket = sentPackets_[lastSendSeqNmb_];
+        byte seqNmb = packet.sequenceNmb  ;
+
         if (isAck)
         {
             if (seqNmb == 1)
@@ -26,13 +27,15 @@ void Sender::ReceivePacket(const Packet &packet)
             {
                 CalculateNewRTT(packet.rtt);
             }
+            timer_ = 0.0f;
             lastSendSeqNmb_++;
-            timer_ = rto_;
+            
         }
         else
         {
-           
-            SendPacket(packet);
+
+            return ;
+            
         }
     
    
@@ -93,20 +96,24 @@ void Sender::CalculateFirstRTT(float r)
     //TODO Calculate SRTT, RTTVAR and RTO according to RFC 6298
     
 	srtt_ = r;
-	rttvar_ = r / 2;
+	rttvar_ = r / 2.0f;
     rto_ = srtt_ + std::max(g_, k_ * rttvar_);
-
+    if (rto_ < 1.0f)
+        rto_ = 1.0f;
 }
 
 void Sender::CalculateNewRTT(float r)
 {
     //TODO Calculate SRTT, RTTVAR and RTO according to RFC 6298
-
-     rttvar_ = (1 - beta_) * rttvar_ + beta_ * ( srtt_ - r);
-     srtt_ = (1 - alpha_) * srtt_ + (alpha_ * r);
+    rttvar_ = (1.f - beta_) * rttvar_ + beta_ * std::abs(srtt_ - r);
+    srtt_ = (1.f - alpha_) * srtt_ + alpha_ * r;
+    rto_ = srtt_ + std::max(g_, k_ * rttvar_);
+    if (rto_ < 1.0f) rto_ = 1.0f;
 }
 
-bool Sender::IsMessageSent() const {
+bool Sender::IsMessageSent() const
+{
+	
     return lastSendSeqNmb_ == sentPackets_.size() + 1;
 }
 
@@ -116,9 +123,11 @@ void Sender::OnTimeout()
     packet.rtt = packetDelay_;
     SendPacket(packet);
     //TODO update RTT and timer
-    rto_ *= 2;
-    timer_ = rto_;
-    if (rto_ < 3.0f) rto_ = 3.0f;
+    timer_ = 0.0f;
+    rto_ *= 2.0f;
+    if (rto_ < 1.0f)
+        rto_ = 1.0f;
+    
 }
 
 void Sender::SendNewPacket(float packetDelay)
