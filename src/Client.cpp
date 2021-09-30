@@ -4,34 +4,34 @@
 
 bool Client::CheckCorrupt(const Packet &packet)
 {
+
     byte checksum = 0;
-    /*******************************
-     * Begin Generate the checksum
-     */
+    checksum = packet.checksum;
 
-    /*******************************
-     * End Generate the checksum
-     */
-
-    /*******************************
-     * Compare the checksum in the packet and the generated one
-     * and return the result
-     */
-
-    return false;
+   if(GenerateChecksum(packet).checksum == checksum && GenerateChecksum(packet).sequenceNmb == packet.sequenceNmb)
+   { 
+       return true;
+   }
+   else
+   {
+       return false;
+   }
+	
 }
 
 Packet Client::GenerateChecksum(const Packet &packet)
 {
     Packet generatedPacket = packet;
-    byte checksum = 0;
-    /*******************************
-     * Begin Generate the checksum
-     */
+    byte checksum = generatedPacket.sequenceNmb; 
+   
 
-    /*******************************
-     * End Generate the checksum
-     */
+    for (auto packetData : generatedPacket.data)
+    {
+        checksum += packetData;
+    }
+
+    generatedPacket.checksum = checksum;
+    
     return generatedPacket;
 }
 

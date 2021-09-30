@@ -4,32 +4,38 @@
 #include <iostream>
 #include "Packet.h"
 #include "Sender.h"
+
 #include "Channel.h"
 
 void Sender::ReceivePacket(const Packet &packet)
 {
-    //TODO check if received packet is corrupted
+    //check if received packet is corrupted
 
-
-    bool isAck = packet.data[0];
-    byte seqNmb = packet.sequenceNmb;
-    const Packet& sentPacket = sentPackets_[seqNmb-1];
-    if(isAck)
-    {
-        if(seqNmb == 1)
+		CheckCorrupt(packet);
+    
+        bool isAck = packet.data[0];
+        byte seqNmb = packet.sequenceNmb ;
+        const Packet& sentPacket = sentPackets_[lastSendSeqNmb_];
+        if (isAck)
         {
-            CalculateFirstRTT(packet.rtt);
+            if (seqNmb == 1)
+            {
+                CalculateFirstRTT(packet.rtt);
+            }
+            else
+            {
+                CalculateNewRTT(packet.rtt);
+            }
+            lastSendSeqNmb_++;
+            timer_ = rto_;
         }
         else
         {
-            CalculateNewRTT(packet.rtt);
+           
+            SendPacket(packet);
         }
-        //TODO manage internal state when receiving ack
-    }
-    else
-    {
-        //TODO manage internal state when receiving nak
-    }
+    
+   
 }
 
 void Sender::SendPacket(const Packet &packet)
@@ -85,11 +91,19 @@ byte Sender::GetLastSendSeqNmb() const
 void Sender::CalculateFirstRTT(float r)
 {
     //TODO Calculate SRTT, RTTVAR and RTO according to RFC 6298
+    
+	srtt_ = r;
+	rttvar_ = r / 2;
+    rto_ = srtt_ + std::max(g_, k_ * rttvar_);
+
 }
 
 void Sender::CalculateNewRTT(float r)
 {
     //TODO Calculate SRTT, RTTVAR and RTO according to RFC 6298
+
+     rttvar_ = (1 - beta_) * rttvar_ + beta_ * ( srtt_ - r);
+     srtt_ = (1 - alpha_) * srtt_ + (alpha_ * r);
 }
 
 bool Sender::IsMessageSent() const {
@@ -102,7 +116,9 @@ void Sender::OnTimeout()
     packet.rtt = packetDelay_;
     SendPacket(packet);
     //TODO update RTT and timer
-
+    rto_ *= 2;
+    timer_ = rto_;
+    if (rto_ < 3.0f) rto_ = 3.0f;
 }
 
 void Sender::SendNewPacket(float packetDelay)
